@@ -1,18 +1,16 @@
 package com.example.project1.Payload.Request;
 
-import jakarta.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+@AllArgsConstructor
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 @Builder
-public class RegisterRequest {
-    private String name;
-    @NotEmpty
-    private String email;
-    private String password;
+public class TaskUpdateRequest {
+    private Long taskId;
+    private boolean completed;
+
 }
