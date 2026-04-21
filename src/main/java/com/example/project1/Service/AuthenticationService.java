@@ -76,16 +76,16 @@ public class AuthenticationService {
         var user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-        // COMMENT THIS OUT TEMPORARILY FOR TESTING
-    /*
+
+
     if (!user.isVerified()) {
         throw new RuntimeException("Account not verified. Please check your email.");
     }
-    */
+
 
         revokeAllUserTokens(user);
         var jwtToken = jwtService.generateToken(user);
-        saveUserToken(user, jwtToken);
+          saveUserToken(user, jwtToken);
 
         return AuthenticationResponse.builder()
                 .token(jwtToken)

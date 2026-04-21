@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    networks:
+      - s-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      # Database configuration (matches your properties)
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/tracker_db?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: shashwat@16
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+
+      # JPA configuration
+      SPRING_JPA_SHOW_SQL: "true"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+
+      # Email configuration (your Gmail credentials)
+      SPRING_MAIL_HOST: smtp.gmail.com
+      SPRING_MAIL_PORT: 587
+      SPRING_MAIL_USERNAME: shashwatsharma274@gmail.com
+      SPRING_MAIL_PASSWORD: skxc xogs dwyh tqon
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+
+      # JWT Secret
+      JWT_SECRET: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+
+  mysql:
+    image: mysql:8.0
+    container_name: task_tracker_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: shashwat@16
+      MYSQL_DATABASE: tracker_db
+    ports:
+      - "3307:3306"                    # Host port 3307 → Container port 3306
+    networks:
+      - s-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pshashwat@16"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+networks:
+  s-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
