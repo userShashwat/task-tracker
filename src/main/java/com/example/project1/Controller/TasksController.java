@@ -5,76 +5,83 @@ import com.example.project1.Payload.Request.TaskUpdateRequest;
 import com.example.project1.Service.TasksService;
 import com.example.project1.model.Tasks;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.ui.Model;
-import org.springframework.security.core.Authentication;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-
+import java.util.Map;
 
 @RestController
 @RequestMapping("/tasks")
 public class TasksController {
+
     @Autowired
-     TasksService tasksService;
+    private TasksService tasksService;
 
     @PostMapping("/add")
-    public String loginSuccess(Model model, Authentication authentication, @RequestBody TaskRequest taskRequest) {
+    public ResponseEntity<String> createTask(Authentication authentication,
+                                             @RequestBody TaskRequest taskRequest) {
+        // Get email from authenticated user
         String userEmail = authentication.getName();
 
         // Create the task for the logged-in user
         boolean taskCreated = tasksService.createTaskForEmail(userEmail, taskRequest);
 
         if (taskCreated) {
-            // Task created successfully
-            model.addAttribute("message", "Task created successfully.");
+            return ResponseEntity.ok("Task created successfully.");
         } else {
-            // Task creation failed
-            model.addAttribute("message", "Failed to create the task.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to create the task.");
+        }
+    }
+
+    @GetMapping("/all-tasks")
+    public ResponseEntity<List<Tasks>> getUserTasks(Authentication authentication) {
+        String userEmail = authentication.getName();
+        List<Tasks> userTasks = tasksService.getTasksByEmail(userEmail);
+        return ResponseEntity.ok(userTasks);
+    }
+
+    @PutMapping("/update/{taskId}")
+    public ResponseEntity<?> updateTaskCompletion(
+            @PathVariable Long taskId,
+            @RequestBody Map<String, Boolean> update,
+            Authentication authentication) {
+
+        String userEmail = authentication.getName();
+        Boolean completed = update.get("completed");
+
+        if (completed == null) {
+            return ResponseEntity.badRequest().body("Missing 'completed' field");
         }
 
-        // Redirect to a success page or display a message to the user
-        return "success-page";
-    }
-    @GetMapping("/all-tasks")
-    public List<Tasks> getUserTasks(Authentication authentication) {
-        // Get the currently logged-in user's email
-        String userEmail = authentication.getName();
-
-        // Retrieve tasks associated with the user's email
-        List<Tasks> userTasks = tasksService.getTasksByEmail(userEmail);
-
-        return userTasks;
-    }
-    @PutMapping("/update")
-    public ResponseEntity<String> updateTask(@RequestBody TaskUpdateRequest updateRequest) {
-        // You can include the task ID and completed status in TaskUpdateRequest.
-        boolean taskUpdated =tasksService.updateTaskCompletion(updateRequest.getTaskId(), updateRequest.isCompleted());
+        boolean taskUpdated = tasksService.updateTaskCompletionWithOwnership(
+                taskId, completed, userEmail);
 
         if (taskUpdated) {
-            return ResponseEntity.ok("Task updated successfully.");
+            return ResponseEntity.ok(Map.of(
+                    "message", "Task updated successfully",
+                    "taskId", taskId,
+                    "completed", completed
+            ));
         } else {
-            return ResponseEntity.badRequest().body("Failed to update task.");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Task not found or access denied"));
         }
     }
+
     @DeleteMapping("/delete/{taskId}")
-    public ResponseEntity<String> deleteTask(@PathVariable Long taskId, Authentication authentication) {
+    public ResponseEntity<String> deleteTask(@PathVariable Long taskId,
+                                             Authentication authentication) {
+        String userEmail = authentication.getName();
+        boolean taskDeleted = tasksService.deleteTaskByIdAndUserEmail(taskId, userEmail);
 
-        String userEmail = authentication.getName(); // Get the currently logged-in user's email
-
-        boolean taskDeleted = tasksService.deleteTaskByIdAndUserEmail(taskId, userEmail); // Call the service method to delete the task with the provided taskId and userEmail
-
-        // Check the result and return an appropriate response
         if (taskDeleted) {
             return ResponseEntity.ok("Task deleted successfully.");
         } else {
             return ResponseEntity.badRequest().body("Failed to delete the task.");
         }
     }
-
-
 }

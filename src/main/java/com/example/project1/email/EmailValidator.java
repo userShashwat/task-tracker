@@ -9,8 +9,7 @@ import java.util.regex.Pattern;
 public class EmailValidator implements Predicate<String> {
 
     private static final String REGEX_PATTERN =
-            "^[_A-Za-z0-9-\\+]+(\\.[_A-Za-z0-9-]+)*@" +
-                    "[A-Za-z0-9-]+(\\.[A-Za-z0-9]+)*(\\.[A-Za-z]{2,})$";
+            "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$";
 
     // Use static final for performance
     private static final Pattern PATTERN = Pattern.compile(REGEX_PATTERN);

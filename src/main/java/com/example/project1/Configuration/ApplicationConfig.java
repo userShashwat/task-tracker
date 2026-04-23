@@ -26,9 +26,10 @@ public class ApplicationConfig {
     }
 
     @Bean
-    public AuthenticationProvider authenticationProvider(UserDetailsService userDetailsService) {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(); // ✅ default constructor
-        authProvider.setUserDetailsService(userDetailsService);                  // ✅ setter
+    public AuthenticationProvider authenticationProvider() {
+        // FIXED: DaoAuthenticationProvider has no-arg constructor, then set UserDetailsService
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(userDetailsService());
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }

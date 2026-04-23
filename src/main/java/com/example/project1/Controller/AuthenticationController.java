@@ -21,10 +21,7 @@ public class AuthenticationController {
     public ResponseEntity<String> register(@RequestBody RegisterRequest request) { //takes in an HTTP request body (typically in JSON format) and maps it to a RegisterRequest object using @RequestBody
         return ResponseEntity.ok(authenticationService.register(request));
     }
-    //    @PostMapping("/registerAdmin")
-//    public ResponseEntity<String> registerAdmin(@RequestBody RegisterRequest request) {
-//        return ResponseEntity.ok(authenticationService.registerAdmin(request));
-//    }
+
     @PostMapping("/login")
     public ResponseEntity<AuthenticationResponse> login(@RequestBody LoginRequest request) {
         return ResponseEntity.ok(authenticationService.login(request));

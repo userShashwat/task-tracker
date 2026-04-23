@@ -6,10 +6,7 @@ import com.example.project1.model.Users;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
 import java.util.Optional;
 
@@ -20,6 +17,7 @@ public class UsersController {
     private UsersRepository usersRepository;
     @Autowired
     private UsersService userService;
+    @GetMapping("/get")
     public ResponseEntity<Users> getUserDetailsById(@RequestParam Integer id){
         Optional<Users> user=usersRepository.findById(id);
         return ResponseEntity.ok(user.get());

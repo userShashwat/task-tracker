@@ -3,18 +3,27 @@ package com.example.project1.Service;
 import com.example.project1.Payload.Request.TaskRequest;
 import com.example.project1.Repository.TasksRepository;
 import com.example.project1.model.Tasks;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+
 @Service
 public class TasksService {
+
     @Autowired
     TasksRepository taskRepository;
 
-    // Other business logic...
+    // FIXED: Added null checks
     public boolean createTaskForEmail(String email, TaskRequest request) {
+        // NULL CHECK #1
+        if (email == null || request == null) {
+            return false;
+        }
+
         Tasks task = new Tasks();
         task.setEmail(email);
         task.setTitle(request.getTitle());
@@ -31,60 +40,51 @@ public class TasksService {
         }
     }
 
-
+    // FIXED: Added null check
     public List<Tasks> getTasksByEmail(String email) {
+        // NULL CHECK #2
+        if (email == null) {
+            return new ArrayList<>();  // Return empty list instead of null
+        }
         return taskRepository.findByEmail(email);
     }
 
-    public boolean updateTaskCompletion(Long taskId, boolean completed) {
-        try {
-            // Validate if taskId is not null
-            if (taskId == null) {
-                return false; // Invalid taskId
-            }
-            // Retrieve the task from the database by its ID
-            Optional<Tasks> optionalTask = taskRepository.findById(taskId);
+    // FIXED: Added null check
+    @Transactional
+    public boolean updateTaskCompletionWithOwnership(Long taskId, boolean completed, String userEmail) {
+        // Use repository method with ownership check
+        Optional<Tasks> optionalTask = taskRepository.findByIdAndEmail(taskId, userEmail);
 
-            if (optionalTask.isPresent()) {
-                Tasks task = optionalTask.get();
-
-                // Update the completed status
-                task.setCompleted(completed);
-
-                // Save the updated task back to the database
-                taskRepository.save(task);
-
-                return true; // Task updated successfully.
-            } else {
-                // Task with the given ID not found
-                return false;
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false; // Failed to update the task.
+        if (optionalTask.isEmpty()) {
+            return false;  // Task doesn't exist or doesn't belong to user
         }
+
+        Tasks task = optionalTask.get();
+        task.setCompleted(completed);
+        taskRepository.save(task);
+        return true;
     }
 
-    // Other service methods...
+    // FIXED: Added null checks
     public boolean deleteTaskByIdAndUserEmail(Long taskId, String userEmail) {
+        // NULL CHECK #4
+        if (taskId == null || userEmail == null) {
+            return false;
+        }
+
         try {
-            // Retrieve the task from the database by its ID and user's email
             Optional<Tasks> optionalTask = taskRepository.findByIdAndEmail(taskId, userEmail);
 
             if (optionalTask.isPresent()) {
                 Tasks task = optionalTask.get();
-
-                // Delete the task from the database
                 taskRepository.delete(task);
-
-                return true; // Task deleted successfully.
+                return true;
             } else {
-                // Task with the given ID and user's email not found
                 return false;
             }
         } catch (Exception e) {
             e.printStackTrace();
-            return false; // Failed to delete the task.
+            return false;
         }
     }
 }
