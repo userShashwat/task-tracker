@@ -17,7 +17,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -74,8 +76,101 @@ class TasksControllerTest {
                      .principal(authentication))
              .andExpect(status().isOk())
              .andExpect(content().string("Task created successfully."));
-        verify(tasksService, times(1)).createTaskForEmail(anyString(), any(TaskRequest.class));
+     verify(tasksService, times(1)).createTaskForEmail(anyString(), any(TaskRequest.class));
 
     }
+    @Test
+    void createTask_Failure_ReturnsInternalServerError() throws Exception{
+        when(authentication.getName()).thenReturn("john@example.com");
+        when(tasksService.createTaskForEmail(anyString(),any(TaskRequest.class))).thenReturn(false);
+        mockMvc.perform(post("/tasks/add")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(taskRequest))
+                .principal(authentication))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().string("Failed to create the task."));
+
+    }
+    @Test
+    void getUserTasks_ReturnsListOfTasks() throws Exception{
+        when(authentication.getName()).thenReturn("john@example.com");
+        List<Tasks> tasksList=Arrays.asList(task);
+        when(tasksService.getTasksByEmail("john@example.com")).thenReturn(tasksList);
+        mockMvc.perform(get("/tasks/all-tasks")
+                .principal(authentication))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+
+    }
+    @Test
+    void getUserTasks_NoTasks_ReturnsEmptyList() throws Exception{
+        when(authentication.getName()).thenReturn("john@example.com");
+        when(tasksService.getTasksByEmail("john@example.com")).thenReturn(Arrays.asList());
+        mockMvc.perform(get("/tasks/all-tasks")
+                .principal(authentication))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+    @Test
+    void updateTask_Success_ReturnsOk() throws Exception{
+        when(authentication.getName()).thenReturn("john@example.com");
+        Long taskId=1L;
+        Map<String,Boolean> update =new HashMap<>();
+        update.put("completed",true);
+        when(tasksService.updateTaskCompletionWithOwnership(eq(taskId), eq(true), eq("john@example.com"))).thenReturn(true);
+        mockMvc.perform(put("/tasks/update/{taskId}",taskId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateRequest))
+                .principal(authentication))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Task updated successfully"));
+    }
+
+
+    @Test
+    void updateTask_Failure_ReturnsForbidden() throws Exception {
+        // Arrange
+        Long taskId = 1L;
+        Map<String, Boolean> updateRequest = new HashMap<>();
+        updateRequest.put("completed", true);
+
+        when(authentication.getName()).thenReturn("john@example.com");
+        when(tasksService.updateTaskCompletionWithOwnership(eq(taskId), eq(true), eq("john@example.com")))
+                .thenReturn(false);
+
+        // Act & Assert - UPDATED for new code
+        mockMvc.perform(put("/tasks/update/{taskId}", taskId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateRequest))
+                        .principal(authentication))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("Task not found or access denied"));  // ← JSON assertion
+    }
+    @Test
+    void deleteTask_Success_ReturnsOk() throws Exception {
+        Long taskId = 1L;
+        when(authentication.getName()).thenReturn("john@example.com");
+        when(tasksService.deleteTaskByIdAndUserEmail(eq(taskId),eq("john@example.com"))).thenReturn(true);
+        mockMvc.perform(delete("/tasks/delete/{taskId}", 1L)
+                        .principal(authentication))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Task deleted successfully."));
+
+    }
+    @Test
+    void deleteTask_Failure_ReturnsBadRequest() throws Exception {
+        // Arrange
+        when(authentication.getName()).thenReturn("john@example.com");
+        when(tasksService.deleteTaskByIdAndUserEmail(eq(1L), eq("john@example.com")))
+                .thenReturn(false);
+
+        // Act & Assert
+        mockMvc.perform(delete("/tasks/delete/{taskId}", 1L)
+                        .principal(authentication))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Failed to delete the task."));
+    }
+
+
 
 }

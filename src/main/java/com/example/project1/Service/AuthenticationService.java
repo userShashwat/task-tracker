@@ -88,7 +88,7 @@ public class AuthenticationService {
     @Transactional
     public String confirmToken(String token) {
         Token confirmationToken = tokenRepository.findByToken(token)
-                .orElseThrow(() -> new IllegalStateException("Token not found"));
+                   .orElseThrow(() -> new IllegalStateException("Token not found"));
 
         // Guard: Check if already confirmed
         if (confirmationToken.getConfirmedAt() != null) {

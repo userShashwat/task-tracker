@@ -129,43 +129,42 @@ public class TasksServiceTest {
     @Test
     @DisplayName("Should return true when task is updated successfully")
     void updateTaskCompletion_ShouldReturnTrue_WhenTaskExists(){
-        when(tasksRepository.findById(1L)).thenReturn(Optional.of(validTask));
+        when(tasksRepository.findByIdAndEmail(1L, testEmail)).thenReturn(Optional.of(validTask));
         when(tasksRepository.save(any(Tasks.class))).thenReturn(validTask);
 
-        boolean result = tasksService.updateTaskCompletion(1L, true);
+        boolean result = tasksService.updateTaskCompletionWithOwnership(1L, true, testEmail);
 
         assertThat(result).isTrue();
         assertThat(validTask.getCompleted()).isTrue();
-        verify(tasksRepository, times(1)).findById(1L);
+        verify(tasksRepository, times(1)).findByIdAndEmail(1L, testEmail);
         verify(tasksRepository, times(1)).save(any(Tasks.class));
     }
 
     @Test
     @DisplayName("Should return false when task does not exist")
     void updateTaskCompletion_ShouldReturnFalse_WhenTaskDoesNotExist(){
-        when(tasksRepository.findById(999L)).thenReturn(Optional.empty());
+        when(tasksRepository.findByIdAndEmail(999L, testEmail)).thenReturn(Optional.empty());
 
-        boolean result = tasksService.updateTaskCompletion(999L, true);
+        boolean result = tasksService.updateTaskCompletionWithOwnership(999L, true, testEmail);
 
         assertThat(result).isFalse();
-        verify(tasksRepository, times(1)).findById(999L);
+        verify(tasksRepository, times(1)).findByIdAndEmail(999L, testEmail);
         verify(tasksRepository, never()).save(any(Tasks.class));
     }
 
     @Test
     @DisplayName("Should return false when task ID is null")
     void updateTaskCompletion_ShouldReturnFalse_WhenIdIsNull(){
-        boolean result = tasksService.updateTaskCompletion(null, true);
+        boolean result = tasksService.updateTaskCompletionWithOwnership(null, true, testEmail);
 
         assertThat(result).isFalse();
-        verify(tasksRepository, never()).findById(any());
+        verify(tasksRepository, never()).findByIdAndEmail(any(), any());
         verify(tasksRepository, never()).save(any(Tasks.class));
     }
 
     @Test
     @DisplayName("Should change status from false to true when updated")
     void updateTaskCompletion_ShouldChangeStatusFromFalseToTrue(){
-        // Create a fresh task with completed = false
         Tasks freshTask = new Tasks();
         freshTask.setId(1L);
         freshTask.setEmail(testEmail);
@@ -173,18 +172,16 @@ public class TasksServiceTest {
         freshTask.setDescription("Test Description");
         freshTask.setCategory("Work");
         freshTask.setCompleted(false);
-
-        when(tasksRepository.findById(1L)).thenReturn(Optional.of(freshTask));
+        when(tasksRepository.findByIdAndEmail(1L, testEmail)).thenReturn(Optional.of(freshTask));
         when(tasksRepository.save(any(Tasks.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        boolean result = tasksService.updateTaskCompletion(1L, true);
+        boolean result = tasksService.updateTaskCompletionWithOwnership(1L, true, testEmail);
 
         assertThat(result).isTrue();
-        assertThat(freshTask.getCompleted()).isTrue(); // Changed from false to true
-        verify(tasksRepository, times(1)).findById(1L);
-        verify(tasksRepository, times(1)).save(freshTask);
+        assertThat(freshTask.getCompleted()).isTrue();
+        verify(tasksRepository, times(1)).findByIdAndEmail(1L, testEmail);
+        verify(tasksRepository, times(1)).save(freshTask);  // ← Save was called with freshTask
     }
-
     @Test
     @DisplayName("Should return true when task is deleted successfully")
     void deleteTaskByIdAndUserEmail_ShouldReturnTrue_WhenTaskExists(){
