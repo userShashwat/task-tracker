@@ -28,14 +28,31 @@ jobs:
           context: .
           push: true
           tags: ${{ env.IMAGE_NAME }}:latest
-    - name: Build and push
-      uses: docker/build-push-action@v7
+    - name: copy docker compose to ec2   
+      uses: appleboy/scp-action@v1
       with:
-          context: .
-          push: true
-          tags: name: Build and push
-        uses: docker/build-push-action@v7
-        with:
-          context: "{{defaultContext}}:mysubdir"
-          push: true
-          tags: ${{ env.IMAGE_NAME }}:latest     
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          port: ${{ secrets.PORT }}
+          source: "docker-compose.yml"
+          target: "/home/${{ secrets.EC2_USER }}/task-tracker"
+    - name: Deploy on EC2
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/${{ secrets.EC2_USER }}/task-tracker
+            cat > .env << EOF
+            SPRING_DATASOURCE_PASSWORD=${{ secrets.SPRING_DATASOURCE_PASSWORD }}
+            SPRING_MAIL_USERNAME=${{ secrets.SPRING_MAIL_USERNAME }}
+            SPRING_MAIL_PASSWORD=${{ secrets.SPRING_MAIL_PASSWORD }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+            EOF
+            docker pull ${{ env.IMAGE_NAME }}:latest
+            docker-compose down
+            docker-compose up -d
+            docker system prune -f
