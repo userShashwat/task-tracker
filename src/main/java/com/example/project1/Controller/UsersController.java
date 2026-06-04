@@ -18,9 +18,19 @@ public class UsersController {
     @Autowired
     private UsersService userService;
     @GetMapping("/get")
-    public ResponseEntity<Users> getUserDetailsById(@RequestParam Integer id){
-        Optional<Users> user=usersRepository.findById(id);
-        return ResponseEntity.ok(user.get());
+    public ResponseEntity<?> getUserDetailsById(@RequestParam Integer id, Authentication authentication) {
+        String loggedInEmail = authentication.getName();
+        Optional<Users> user = usersRepository.findById(id);
+        if (user.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!user.get().getEmail().equals(loggedInEmail)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Cannot view other users");
+        }
+        Users safeUser = user.get();
+        safeUser.setPassword(null);
+        return ResponseEntity.ok(safeUser);
     }
     @DeleteMapping("/delete")
     public ResponseEntity<String> deleteLoggedInUser(Authentication authentication) {

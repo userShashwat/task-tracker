@@ -27,6 +27,7 @@ public class Token {
 
     public boolean revoked;
     public boolean expired;
+
     public LocalDateTime confirmedAt;
     public LocalDateTime expiredAt;
 

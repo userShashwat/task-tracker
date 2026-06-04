@@ -1,5 +1,5 @@
-package com.example.project1.Service;
 
+package com.example.project1.Service;
 
 import com.example.project1.Payload.Request.LoginRequest;
 import com.example.project1.Payload.Request.RegisterRequest;
@@ -14,12 +14,14 @@ import com.example.project1.model.Users;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -33,20 +35,19 @@ public class AuthenticationService {
     private final EmailValidator emailValidator;
     private final EmailSender emailSender;
 
-    // Modernized Register: Validates, Saves, and triggers Verification email
     @Transactional
     public String register(RegisterRequest request) {
-        // 1. Single check for existence to save DB resources
+        // 1. Check if email already exists
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("User already exists with email: " + request.getEmail());
         }
 
-        // 2. Validate email format using your custom Predicate
+        // 2. Validate email format
         if (!emailValidator.test(request.getEmail())) {
             throw new IllegalStateException("Email format is invalid");
         }
 
-        // 3. Build user with hashed password
+        // 3. Build user with hashed password (verified = FALSE)
         var user = Users.builder()
                 .name(request.getName())
                 .email(request.getEmail())
@@ -56,12 +57,14 @@ public class AuthenticationService {
 
         var savedUser = userRepository.save(user);
 
-        // 4. Token Generation for email confirmation
-        var jwtToken = jwtService.generateToken(user);
-        saveUserToken(savedUser, jwtToken);
+        // 4. FIXED: Generate RANDOM UUID for confirmation (NOT JWT)
+        String confirmationToken = UUID.randomUUID().toString();
 
-        // 5. Send Email (Note: URL should ideally come from @Value or Config)
-        String activationLink = "http://localhost:8080/auth/confirm?token=" + jwtToken;
+        // 5. FIXED: Save as CONFIRMATION token type
+        saveConfirmationToken(savedUser, confirmationToken);
+
+        // 6. Send email with UUID token (NOT JWT)
+        String activationLink = "http://localhost:8080/auth/confirm?token=" + confirmationToken;
         emailSender.send(request.getEmail(), buildEmail(request.getName(), activationLink));
 
         return "Registration successful! Please check your email to verify your account.";
@@ -69,69 +72,103 @@ public class AuthenticationService {
 
     public AuthenticationResponse login(LoginRequest request) {
         // 1. Authenticate via Spring Security
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
+        Authentication authenticate=authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
 
-        var user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+        // 2. Find the user
+        Users user = (Users) authenticate.getPrincipal();
+        // 3. Check if email is verified
+        if (!user.isVerified()) {
+            throw new RuntimeException("Account not verified. Please check your email to verify your account.");
+        }
 
-        revokeAllUserTokens(user);
+        // 4. Revoke all existing BEARER tokens only
+        revokeAllUserBearerTokens(user);
+
+        // 5. Generate NEW JWT for authentication
         var jwtToken = jwtService.generateToken(user);
-          saveUserToken(user, jwtToken);
 
+        // 6. Save as BEARER type (authentication token)
+        saveBearerToken(user, jwtToken);
+
+        // 7. Return response
         return AuthenticationResponse.builder()
                 .token(jwtToken)
                 .message("Logged in successfully")
                 .build();
     }
+
     @Transactional
     public String confirmToken(String token) {
+        // 1. Find token in database
         Token confirmationToken = tokenRepository.findByToken(token)
-                   .orElseThrow(() -> new IllegalStateException("Token not found"));
+                .orElseThrow(() -> new IllegalStateException("Token not found"));
 
-        // Guard: Check if already confirmed
+        // 2. FIXED: Verify this is a CONFIRMATION token
+        if (confirmationToken.getTokenType() != TokenType.CONFIRMATION) {
+            throw new IllegalStateException("Invalid token type — this is not a confirmation token");
+        }
+
+        // 3. Check if already confirmed
         if (confirmationToken.getConfirmedAt() != null) {
-            throw new IllegalStateException("Email is already confirmed");
+            throw new IllegalStateException("Email already confirmed");
         }
 
-        // Guard: Check expiration
+        // 4. Check if expired
         if (confirmationToken.getExpiredAt().isBefore(LocalDateTime.now())) {
-            throw new IllegalStateException("Confirmation link has expired");
+            throw new IllegalStateException("Confirmation link has expired. Please register again.");
         }
 
-        // Update database state
-        tokenRepository.updateConfirmedAt(token, LocalDateTime.now());
+        // 5. Update token as confirmed
+        confirmationToken.setConfirmedAt(LocalDateTime.now());
+        tokenRepository.save(confirmationToken);
+
+        // 6. Mark user as verified
         userRepository.verifyUser(confirmationToken.getUser().getEmail());
 
         return "Verification successful! You can now log in.";
     }
 
-    private void saveUserToken(Users user, String jwtToken) {
-        var token = Token.builder()
+    // FIXED: Save CONFIRMATION token (UUID, not JWT)
+    private void saveConfirmationToken(Users user, String token) {
+        var confirmationToken = Token.builder()
                 .user(user)
-                .token(jwtToken)
-                .tokenType(TokenType.BEARER)
+                .token(token)  // This is UUID, not JWT
+                .tokenType(TokenType.CONFIRMATION)  // Important!
                 .expired(false)
                 .revoked(false)
-                .expiredAt(LocalDateTime.now().plusDays(1)) // Reduced to 1 day for security
+                .confirmedAt(null)  // Not confirmed yet
+                .expiredAt(LocalDateTime.now().plusDays(1))  // 24 hours to confirm
                 .build();
-        tokenRepository.save(token);
+        tokenRepository.save(confirmationToken);
     }
 
-    private void revokeAllUserTokens(Users user) {
-        var validUserTokens = tokenRepository.findAllValidTokenByUser(user.getId());
-        if (validUserTokens.isEmpty()) return;
+    // FIXED: Save BEARER token (JWT for authentication)
+    private void saveBearerToken(Users user, String jwtToken) {
+        var bearerToken = Token.builder()
+                .user(user)
+                .token(jwtToken)
+                .tokenType(TokenType.BEARER)  // Different from CONFIRMATION
+                .expired(false)
+                .revoked(false)
+                .confirmedAt(null)  // Not applicable for bearer tokens
+                .expiredAt(LocalDateTime.now().plusDays(1))
+                .build();
+        tokenRepository.save(bearerToken);
+    }
 
-        validUserTokens.forEach(token -> {
+    // FIXED: Only revoke BEARER tokens, leave CONFIRMATION tokens alone
+    private void revokeAllUserBearerTokens(Users user) {
+        var validBearerTokens = tokenRepository.findAllValidBearerTokensByUser(user.getId());
+        if (validBearerTokens.isEmpty()) return;
+
+        validBearerTokens.forEach(token -> {
             token.setExpired(true);
             token.setRevoked(true);
         });
-        tokenRepository.saveAll(validUserTokens);
+        tokenRepository.saveAll(validBearerTokens);
     }
 
     private String buildEmail(String name, String link) {
-        // Modernized template using simple inline styles
         return "<div style=\"font-family:Arial,sans-serif; padding:20px; border:1px solid #eee; border-radius:10px; max-width:600px;\">" +
                 "<h2>Confirm your Email</h2>" +
                 "<p>Hi " + name + ",</p>" +

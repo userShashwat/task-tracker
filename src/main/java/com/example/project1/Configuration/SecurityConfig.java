@@ -1,5 +1,6 @@
 package com.example.project1.Configuration;
 
+import com.example.project1.Token.Token;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -34,13 +35,11 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/auth/**",
-                                "/api/product/getAll",
-                                "/api/product/search/**"
+                                "/auth/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
-                // --- ADDED ERROR LOGGING START ---
+
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) -> {
                             // This will print the actual reason for the 403/401 in your IDE console
@@ -52,20 +51,17 @@ public class SecurityConfig {
                             response.getWriter().write("{\"error\": \"" + authException.getMessage() + "\"}");
                         })
                 )
-                // --- ADDED ERROR LOGGING END ---
+
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authenticationProvider(authenticationProvider)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .logout(logout -> logout
-                        .logoutUrl("/auth/logout")
                         .addLogoutHandler(logoutHandler())
-                        .logoutSuccessHandler((request, response, authentication) ->
-                                SecurityContextHolder.clearContext()
-                        )
                 );
 
         return http.build();
     }
+
 }

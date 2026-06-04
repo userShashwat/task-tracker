@@ -43,37 +43,37 @@ public class Users implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // Return an empty list or roles (e.g., SimpleGrantedAuthority("USER"))
+
         return List.of();
     }
 
     @Override
     public String getPassword() {
-        return password; // Fix: Must return the hashed password field
+        return password;
     }
 
     @Override
     public String getUsername() {
-        return email; // Fix: Since email is your login identifier
+        return email;
     }
 
     @Override
     public boolean isAccountNonExpired() {
-        return true; // Set to true so login isn't blocked
+        return true;
     }
 
     @Override
     public boolean isAccountNonLocked() {
-        return true; // Set to true
+        return true;
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return true; // Set to true
+        return true;
     }
 
     @Override
     public boolean isEnabled() {
-        return verified; // Only allows login if the user has confirmed their email
+        return verified;
     }
 }
